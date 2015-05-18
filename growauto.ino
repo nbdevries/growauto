@@ -1,36 +1,46 @@
 #include "Arduino.h"
 #include <DHT.h>
 #include <LiquidCrystal.h>
+#include <Servo.h>
+
+// the type of humidity sensor we are using
+#define DHTTYPE DHT22   // also, AM2302
 
 // PIN's being used
 #define DHTPIN 2        // humidity + temperature sensor
 #define LHTPIN A0       // light sensor
 #define BT1PIN 12       // button 1
 #define BT2PIN 11       // button 2
+#define SERVOH 9        // servo controlling humidity
 LiquidCrystal lcd(7, 8, 3, 4, 5, 6); // LCD's PINs
 
-// the type of humidity sensor we are using
-#define DHTTYPE DHT22   // also, AM2302
+// init sensor and servo
+DHT dht(DHTPIN, DHTTYPE);  // DHT sensor for normal 16mhz Arduino
+Servo hmdtServo;           // Servo..
 
-// Initialize DHT sensor for normal 16mhz Arduino
-DHT dht(DHTPIN, DHTTYPE);
-
-
-// Global Variables
 // readings
 float minHmdt = 1000; // max and min humidity
 float maxHmdt = 0;
-float minTemp = 1000; // max and min temperature
+float minTemp = 1000; // "   "   "   temperature
 float maxTemp = 0;
+
+// humidity servo
+int servoON  = 96;      // position for humidity to be on
+int servoOFF = 110;     // "        "   "        "  "  off
+int INTERVAL = 900;     // 15 minutes
+int crrntInterval = 0;  // currently set interval
+int minHMDT = 95;       // the threshold for firing off the humidifier
 
 void setup() {
   Serial.begin(9600);
-  lcd.begin(16, 2);  // set up the LCD's number of columns and rows
-  dht.begin();       // begin reading temperature and humidity
+  lcd.begin(16, 2);          // set up the LCD's number of columns and rows
+  dht.begin();               // begin reading temperature and humidity
+  hmdtServo.attach(SERVOH);  // Servo's PIN
 }
 
+int DELAY = 2000;
 void loop() {
-  delay(2000); // only calculate new values every 2 seconds
+  delay(DELAY); // only calculate new values every 2 seconds
   
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
@@ -42,6 +52,17 @@ void loop() {
   if (isnan(h) || isnan(t)) {
     Serial.println("Failed to read from DHT sensor!");
     return;
+  }
+  
+  // start ultrasonic humidifier when needed
+  if (h < minHMDT) {
+    crrntInterval = INTERVAL;
+  }
+  if (crrntInterval > 0) {
+   crrntInterval -= DELAY/1000;
+   hmdtServo.write(servoON);
+  } else {
+   hmdtServo.write(servoOFF);
   }
   
   minHmdt = min(minHmdt, h);  // determine min/max values
